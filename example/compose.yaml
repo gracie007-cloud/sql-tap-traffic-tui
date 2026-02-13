@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:18
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: db
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+
+  tapd:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    ports:
+      - "5433:5433"
+      - "9091:9091"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/db?sslmode=disable
+    command:
+      - --listen=:5433
+      - --upstream=postgres:5432
+      - --grpc=:9091
+    depends_on:
+      postgres:
+        condition: service_healthy
