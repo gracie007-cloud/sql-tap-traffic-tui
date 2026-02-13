@@ -12,6 +12,11 @@ formatters:
 linters:
   default: all
   settings:
+    errcheck:
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
     tagliatelle:
       case:
         rules:
