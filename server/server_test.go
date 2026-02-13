@@ -19,7 +19,8 @@ import (
 func startServer(t *testing.T, b *broker.Broker) tapv1.TapServiceClient {
 	t.Helper()
 
-	lis, err := net.Listen("tcp", "localhost:0")
+	var lc net.ListenConfig
+	lis, err := lc.Listen(t.Context(), "tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}

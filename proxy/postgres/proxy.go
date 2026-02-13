@@ -38,7 +38,8 @@ func (p *Proxy) Events() <-chan proxy.Event {
 
 // ListenAndServe starts accepting client connections and relaying them to PostgreSQL.
 func (p *Proxy) ListenAndServe(ctx context.Context) error {
-	lis, err := net.Listen("tcp", p.listenAddr)
+	var lc net.ListenConfig
+	lis, err := lc.Listen(ctx, "tcp", p.listenAddr)
 	if err != nil {
 		return fmt.Errorf("postgres: listen: %w", err)
 	}
@@ -53,16 +54,14 @@ func (p *Proxy) ListenAndServe(ctx context.Context) error {
 		clientConn, err := lis.Accept()
 		if err != nil {
 			if ctx.Err() != nil {
-				return nil
+				return fmt.Errorf("postgres: accept: %w", ctx.Err())
 			}
 			return fmt.Errorf("postgres: accept: %w", err)
 		}
 
-		p.wg.Add(1)
-		go func() {
-			defer p.wg.Done()
+		p.wg.Go(func() {
 			p.handleConn(ctx, clientConn)
-		}()
+		})
 	}
 }
 
@@ -80,7 +79,8 @@ func (p *Proxy) Close() error {
 func (p *Proxy) handleConn(ctx context.Context, clientConn net.Conn) {
 	defer func() { _ = clientConn.Close() }()
 
-	upstreamConn, err := net.Dial("tcp", p.upstreamAddr)
+	var d net.Dialer
+	upstreamConn, err := d.DialContext(ctx, "tcp", p.upstreamAddr)
 	if err != nil {
 		log.Printf("postgres: dial upstream %s: %v", p.upstreamAddr, err)
 		return

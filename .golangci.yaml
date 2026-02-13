@@ -17,6 +17,10 @@ linters:
         - fmt.Fprint
         - fmt.Fprintf
         - fmt.Fprintln
+    wrapcheck:
+      extra-ignore-sigs:
+        - "google.golang.org/grpc/status.Error("
+        - "google.golang.org/grpc/status.Errorf("
     tagliatelle:
       case:
         rules:

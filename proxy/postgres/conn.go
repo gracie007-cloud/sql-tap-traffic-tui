@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -63,8 +64,10 @@ func encodeAndWrite(dst net.Conn, msg encoder) error {
 	if err != nil {
 		return fmt.Errorf("postgres: encode: %w", err)
 	}
-	_, err = dst.Write(buf)
-	return err
+	if _, err := dst.Write(buf); err != nil {
+		return fmt.Errorf("postgres: write: %w", err)
+	}
+	return nil
 }
 
 // relay handles the startup phase and then enters bidirectional message relay.
@@ -114,7 +117,7 @@ func (c *conn) relayStartup() error {
 		case *pgproto.ReadyForQuery:
 			return nil
 		case *pgproto.ErrorResponse:
-			return fmt.Errorf("postgres: auth error from upstream")
+			return errors.New("postgres: auth error from upstream")
 		}
 	}
 }
@@ -123,7 +126,7 @@ func (c *conn) relayStartup() error {
 func (c *conn) relayClientToUpstream(ctx context.Context) error {
 	for {
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return fmt.Errorf("postgres: client relay: %w", ctx.Err())
 		}
 
 		msg, err := c.client.Receive()
@@ -149,7 +152,7 @@ func (c *conn) relayClientToUpstream(ctx context.Context) error {
 func (c *conn) relayUpstreamToClient(ctx context.Context) error {
 	for {
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return fmt.Errorf("postgres: upstream relay: %w", ctx.Err())
 		}
 
 		msg, err := c.upstream.Receive()
@@ -283,10 +286,11 @@ func parseRowsAffected(tag string) int64 {
 }
 
 func isClosedErr(err error) bool {
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return true
 	}
-	if netErr, ok := err.(*net.OpError); ok {
+	var netErr *net.OpError
+	if errors.As(err, &netErr) {
 		return netErr.Err.Error() == "use of closed network connection"
 	}
 	return strings.Contains(err.Error(), "closed")
