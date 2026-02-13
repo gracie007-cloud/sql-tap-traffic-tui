@@ -3,35 +3,10 @@ package explain
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 )
-
-// DetectDriver infers the database driver name from a DSN string.
-//
-//   - "postgres://" or "postgresql://" prefix -> "pgx"
-//   - Contains "@" (MySQL-style user:pass@tcp(...)/db) -> "mysql"
-//   - Contains "=" but not "@" (PostgreSQL key=value style) -> "pgx"
-//   - Otherwise -> error
-func DetectDriver(dsn string) (string, error) {
-	if dsn == "" {
-		return "", errors.New("empty DSN")
-	}
-
-	lower := strings.ToLower(dsn)
-	switch {
-	case strings.HasPrefix(lower, "postgres://"), strings.HasPrefix(lower, "postgresql://"):
-		return "pgx", nil
-	case strings.Contains(dsn, "@"):
-		return "mysql", nil
-	case strings.Contains(dsn, "="):
-		return "pgx", nil
-	}
-
-	return "", fmt.Errorf("explain: cannot detect driver from DSN: %s", dsn)
-}
 
 // Mode selects between EXPLAIN and EXPLAIN ANALYZE.
 type Mode int
