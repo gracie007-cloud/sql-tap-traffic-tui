@@ -122,24 +122,25 @@ Flags:
 
 ### List view
 
-| Key                | Action                               |
-|--------------------|--------------------------------------|
+| Key               | Action                               |
+|-------------------|--------------------------------------|
 | `j` / `↓`         | Move down                            |
 | `k` / `↑`         | Move up                              |
 | `Ctrl+d` / `PgDn` | Half-page down                       |
 | `Ctrl+u` / `PgUp` | Half-page up                         |
-| `/`                | Incremental search                   |
-| `s`                | Toggle sort (chronological/duration) |
-| `Enter`            | Inspect query / transaction          |
-| `Space`            | Toggle transaction expand / collapse |
-| `Esc`              | Clear search filter                  |
-| `x`                | EXPLAIN                              |
-| `X`                | EXPLAIN ANALYZE                      |
-| `e`                | Edit query, then EXPLAIN             |
-| `E`                | Edit query, then EXPLAIN ANALYZE     |
-| `c`                | Copy query                           |
-| `C`                | Copy query with bound args           |
-| `q`                | Quit                                 |
+| `/`               | Incremental search                   |
+| `s`               | Toggle sort (chronological/duration) |
+| `Enter`           | Inspect query / transaction          |
+| `Space`           | Toggle transaction expand / collapse |
+| `Esc`             | Clear search filter                  |
+| `x`               | EXPLAIN                              |
+| `X`               | EXPLAIN ANALYZE                      |
+| `e`               | Edit query, then EXPLAIN             |
+| `E`               | Edit query, then EXPLAIN ANALYZE     |
+| `a`               | Analytics view                       |
+| `c`               | Copy query                           |
+| `C`               | Copy query with bound args           |
+| `q`               | Quit                                 |
 
 ### Inspector view
 
@@ -153,6 +154,20 @@ Flags:
 | `c`       | Copy query                 |
 | `C`       | Copy query with bound args |
 | `q`       | Back to list               |
+
+### Analytics view
+
+| Key       | Action                       |
+|-----------|------------------------------|
+| `j` / `↓` | Move down                    |
+| `k` / `↑` | Move up                      |
+| `Ctrl+d`  | Half-page down               |
+| `Ctrl+u`  | Half-page up                 |
+| `h` / `←` | Scroll left                  |
+| `l` / `→` | Scroll right                 |
+| `s`       | Cycle sort (total/count/avg) |
+| `c`       | Copy query                   |
+| `q`       | Back to list                 |
 
 ### Explain view
 
