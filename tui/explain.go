@@ -23,7 +23,7 @@ func (m Model) updateExplain(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "q":
 		m.view = viewList
-		m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, m.searchQuery, m.sortMode)
+		m.displayRows, m.txColorMap = m.rebuildDisplayRows()
 		if m.follow {
 			m.cursor = max(len(m.displayRows)-1, 0)
 		}

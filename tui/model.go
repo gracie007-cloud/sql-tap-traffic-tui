@@ -153,7 +153,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.view != viewList {
 			return m, recvEvent(m.stream)
 		}
-		m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, m.searchQuery, m.sortMode)
+		m.displayRows, m.txColorMap = m.rebuildDisplayRows()
 		if m.follow {
 			m.cursor = max(len(m.displayRows)-1, 0)
 		}
@@ -260,17 +260,15 @@ func (m Model) listHeight() int {
 	return max(m.height-12, 3)
 }
 
-func rebuildDisplayRows(
-	events []*tapv1.QueryEvent, collapsed map[string]bool, filter string, sortBy sortMode,
-) ([]displayRow, map[string]lipgloss.Color) {
-	matchedEvents := matchingEvents(events, filter)
+func (m Model) rebuildDisplayRows() ([]displayRow, map[string]lipgloss.Color) {
+	matchedEvents := matchingEvents(m.events, m.searchQuery)
 
 	// When filtering or sorting by duration, show flat list (no tx grouping).
-	if filter != "" || sortBy == sortDuration {
+	if m.searchQuery != "" || m.sortMode == sortDuration {
 		var rows []displayRow
 		colorMap := make(map[string]lipgloss.Color)
 		txCount := 0
-		for i, ev := range events {
+		for i, ev := range m.events {
 			if !matchedEvents[i] {
 				continue
 			}
@@ -285,10 +283,10 @@ func rebuildDisplayRows(
 				eventIdx: i,
 			})
 		}
-		if sortBy == sortDuration {
+		if m.sortMode == sortDuration {
 			sort.Slice(rows, func(a, b int) bool {
-				da := events[rows[a].eventIdx].GetDuration().AsDuration()
-				db := events[rows[b].eventIdx].GetDuration().AsDuration()
+				da := m.events[rows[a].eventIdx].GetDuration().AsDuration()
+				db := m.events[rows[b].eventIdx].GetDuration().AsDuration()
 				return da > db // slowest first
 			})
 		}
@@ -300,8 +298,8 @@ func rebuildDisplayRows(
 	colorMap := make(map[string]lipgloss.Color)
 	txCount := 0
 
-	for i := range events {
-		ev := events[i]
+	for i := range m.events {
+		ev := m.events[i]
 		txID := ev.GetTxId()
 
 		switch {
@@ -311,8 +309,8 @@ func rebuildDisplayRows(
 			txCount++
 			// Collect all events with this txID.
 			var indices []int
-			for j := range events {
-				if events[j].GetTxId() == txID {
+			for j := range m.events {
+				if m.events[j].GetTxId() == txID {
 					indices = append(indices, j)
 				}
 			}
@@ -321,7 +319,7 @@ func rebuildDisplayRows(
 				txID:   txID,
 				events: indices,
 			})
-			if !collapsed[txID] {
+			if !m.collapsed[txID] {
 				for _, j := range indices {
 					rows = append(rows, displayRow{
 						kind:     rowEvent,
@@ -467,7 +465,7 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case sortDuration:
 			m.sortMode = sortChronological
 		}
-		m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, m.searchQuery, m.sortMode)
+		m.displayRows, m.txColorMap = m.rebuildDisplayRows()
 		m.cursor = 0
 		return m, nil
 	case "esc":
@@ -475,7 +473,7 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case " ":
 		if txID := m.cursorTxID(); txID != "" {
 			m.collapsed[txID] = !m.collapsed[txID]
-			m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, m.searchQuery, m.sortMode)
+			m.displayRows, m.txColorMap = m.rebuildDisplayRows()
 			for i, r := range m.displayRows {
 				if r.kind == rowTxSummary && r.txID == txID {
 					m.cursor = i
@@ -522,14 +520,14 @@ func (m Model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.searchMode = false
 		m.searchQuery = ""
-		m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, "", m.sortMode)
+		m.displayRows, m.txColorMap = m.rebuildDisplayRows()
 		m.cursor = min(m.cursor, max(len(m.displayRows)-1, 0))
 		return m, nil
 	case "backspace":
 		if len(m.searchQuery) > 0 {
 			_, size := utf8.DecodeLastRuneInString(m.searchQuery)
 			m.searchQuery = m.searchQuery[:len(m.searchQuery)-size]
-			m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, m.searchQuery, m.sortMode)
+			m.displayRows, m.txColorMap = m.rebuildDisplayRows()
 			m.cursor = min(m.cursor, max(len(m.displayRows)-1, 0))
 		}
 		return m, nil
@@ -549,7 +547,7 @@ func (m Model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	m.searchQuery += string(r)
-	m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, m.searchQuery, m.sortMode)
+	m.displayRows, m.txColorMap = m.rebuildDisplayRows()
 	m.cursor = min(m.cursor, max(len(m.displayRows)-1, 0))
 	return m, nil
 }
@@ -588,7 +586,7 @@ func (m Model) copyQuery(withArgs bool) Model {
 func (m Model) clearFilter() Model {
 	if m.searchQuery != "" {
 		m.searchQuery = ""
-		m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, "", m.sortMode)
+		m.displayRows, m.txColorMap = m.rebuildDisplayRows()
 		m.cursor = min(m.cursor, max(len(m.displayRows)-1, 0))
 	}
 	return m
