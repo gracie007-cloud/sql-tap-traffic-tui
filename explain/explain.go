@@ -26,12 +26,22 @@ func (m Mode) String() string {
 	return "EXPLAIN"
 }
 
-func (m Mode) prefix() string {
-	switch m {
-	case Explain:
-		return "EXPLAIN "
-	case Analyze:
-		return "EXPLAIN ANALYZE "
+func (m Mode) prefix(driver Driver) string {
+	switch driver {
+	case MySQL:
+		switch m {
+		case Explain:
+			return "EXPLAIN FORMAT=TREE "
+		case Analyze:
+			return "EXPLAIN ANALYZE "
+		}
+	case Postgres:
+		switch m {
+		case Explain:
+			return "EXPLAIN "
+		case Analyze:
+			return "EXPLAIN ANALYZE "
+		}
 	}
 	return "EXPLAIN "
 }
@@ -42,14 +52,23 @@ type Result struct {
 	Duration time.Duration
 }
 
+// Driver identifies the database driver for EXPLAIN syntax differences.
+type Driver int
+
+const (
+	Postgres Driver = iota
+	MySQL
+)
+
 // Client wraps a database connection for running EXPLAIN queries.
 type Client struct {
-	db *sql.DB
+	db     *sql.DB
+	driver Driver
 }
 
 // NewClient creates a new Client from an existing *sql.DB.
-func NewClient(db *sql.DB) *Client {
-	return &Client{db: db}
+func NewClient(db *sql.DB, driver Driver) *Client {
+	return &Client{db: db, driver: driver}
 }
 
 // Run executes EXPLAIN or EXPLAIN ANALYZE for the given query with optional args.
@@ -59,8 +78,14 @@ func (c *Client) Run(ctx context.Context, mode Mode, query string, args []string
 		anyArgs[i] = a
 	}
 
+	// MySQL cannot parse placeholder ? without args; replace with NULL for plan-only EXPLAIN.
+	q := query
+	if c.driver == MySQL && len(anyArgs) == 0 {
+		q = strings.ReplaceAll(q, "?", "NULL")
+	}
+
 	start := time.Now()
-	rows, err := c.db.QueryContext(ctx, mode.prefix()+query, anyArgs...)
+	rows, err := c.db.QueryContext(ctx, mode.prefix(c.driver)+q, anyArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("explain: query: %w", err)
 	}

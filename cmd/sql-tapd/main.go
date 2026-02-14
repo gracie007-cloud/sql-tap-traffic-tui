@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/mickamy/sql-tap/broker"
@@ -64,7 +65,14 @@ func run(driver, listen, upstream, grpcAddr, dsnEnv string) error {
 		if err != nil {
 			return fmt.Errorf("open db for explain: %w", err)
 		}
-		explainClient = explain.NewClient(db)
+		var explainDriver explain.Driver
+		switch driver {
+		case "mysql":
+			explainDriver = explain.MySQL
+		case "postgres":
+			explainDriver = explain.Postgres
+		}
+		explainClient = explain.NewClient(db, explainDriver)
 		defer func() { _ = explainClient.Close() }()
 		log.Printf("EXPLAIN enabled")
 	} else {
