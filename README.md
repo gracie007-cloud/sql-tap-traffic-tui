@@ -129,6 +129,7 @@ Flags:
 | `Ctrl+d` / `PgDn` | Half-page down                       |
 | `Ctrl+u` / `PgUp` | Half-page up                         |
 | `/`                | Incremental search                   |
+| `s`                | Toggle sort (chronological/duration) |
 | `Enter`            | Inspect query / transaction          |
 | `Space`            | Toggle transaction expand / collapse |
 | `Esc`              | Clear search filter                  |

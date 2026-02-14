@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -25,6 +26,13 @@ const (
 	viewList viewMode = iota
 	viewInspect
 	viewExplain
+)
+
+type sortMode int
+
+const (
+	sortChronological sortMode = iota
+	sortDuration
 )
 
 type rowKind int
@@ -61,6 +69,7 @@ type Model struct {
 
 	searchMode  bool
 	searchQuery string
+	sortMode    sortMode
 
 	inspectScroll  int
 	explainPlan    string
@@ -144,7 +153,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.view != viewList {
 			return m, recvEvent(m.stream)
 		}
-		m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, m.searchQuery)
+		m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, m.searchQuery, m.sortMode)
 		if m.follow {
 			m.cursor = max(len(m.displayRows)-1, 0)
 		}
@@ -228,14 +237,16 @@ func (m Model) View() string {
 	switch {
 	case m.searchMode:
 		footer = fmt.Sprintf("  / %s█", m.searchQuery)
-	case m.searchQuery != "":
-		footer = "  q: quit  j/k: navigate  space: toggle tx  enter: inspect" +
-			"  c: copy query  C: copy with args  x/X: explain/analyze  e/E: edit+explain" +
-			"  esc: clear filter"
 	default:
 		footer = "  q: quit  j/k: navigate  space: toggle tx  enter: inspect" +
 			"  c: copy query  C: copy with args  x/X: explain/analyze  e/E: edit+explain" +
-			"  /: search"
+			"  /: search  s: sort"
+		if m.searchQuery != "" {
+			footer += "  esc: clear filter"
+		}
+		if m.sortMode == sortDuration {
+			footer += "  [sorted: duration]"
+		}
 	}
 
 	return strings.Join([]string{
@@ -250,12 +261,12 @@ func (m Model) listHeight() int {
 }
 
 func rebuildDisplayRows(
-	events []*tapv1.QueryEvent, collapsed map[string]bool, filter string,
+	events []*tapv1.QueryEvent, collapsed map[string]bool, filter string, sortBy sortMode,
 ) ([]displayRow, map[string]lipgloss.Color) {
 	matchedEvents := matchingEvents(events, filter)
 
-	// When filtering, show only matched events (flat, no tx grouping).
-	if filter != "" {
+	// When filtering or sorting by duration, show flat list (no tx grouping).
+	if filter != "" || sortBy == sortDuration {
 		var rows []displayRow
 		colorMap := make(map[string]lipgloss.Color)
 		txCount := 0
@@ -272,6 +283,13 @@ func rebuildDisplayRows(
 			rows = append(rows, displayRow{
 				kind:     rowEvent,
 				eventIdx: i,
+			})
+		}
+		if sortBy == sortDuration {
+			sort.Slice(rows, func(a, b int) bool {
+				da := events[rows[a].eventIdx].GetDuration().AsDuration()
+				db := events[rows[b].eventIdx].GetDuration().AsDuration()
+				return da > db // slowest first
 			})
 		}
 		return rows, colorMap
@@ -432,34 +450,32 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "x", "X":
-		mode := explain.Explain
-		if msg.String() == "X" {
-			mode = explain.Analyze
-		}
-		return m.startExplain(mode)
+		return m.startExplain(explainModeFromKey(msg.String()))
 	case "e", "E":
-		mode := explain.Explain
-		if msg.String() == "E" {
-			mode = explain.Analyze
-		}
-		return m.startEditExplain(mode)
+		return m.startEditExplain(explainModeFromKey(msg.String()))
 	case "c", "C":
 		return m.copyQuery(msg.String() == "C"), nil
 	case "/":
 		m.searchMode = true
 		m.searchQuery = ""
 		return m, nil
-	case "esc":
-		if m.searchQuery != "" {
-			m.searchQuery = ""
-			m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, "")
-			m.cursor = min(m.cursor, max(len(m.displayRows)-1, 0))
+	case "s":
+		switch m.sortMode {
+		case sortChronological:
+			m.sortMode = sortDuration
+			m.follow = false
+		case sortDuration:
+			m.sortMode = sortChronological
 		}
+		m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, m.searchQuery, m.sortMode)
+		m.cursor = 0
 		return m, nil
+	case "esc":
+		return m.clearFilter(), nil
 	case " ":
 		if txID := m.cursorTxID(); txID != "" {
 			m.collapsed[txID] = !m.collapsed[txID]
-			m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, m.searchQuery)
+			m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, m.searchQuery, m.sortMode)
 			for i, r := range m.displayRows {
 				if r.kind == rowTxSummary && r.txID == txID {
 					m.cursor = i
@@ -506,14 +522,14 @@ func (m Model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.searchMode = false
 		m.searchQuery = ""
-		m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, "")
+		m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, "", m.sortMode)
 		m.cursor = min(m.cursor, max(len(m.displayRows)-1, 0))
 		return m, nil
 	case "backspace":
 		if len(m.searchQuery) > 0 {
 			_, size := utf8.DecodeLastRuneInString(m.searchQuery)
 			m.searchQuery = m.searchQuery[:len(m.searchQuery)-size]
-			m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, m.searchQuery)
+			m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, m.searchQuery, m.sortMode)
 			m.cursor = min(m.cursor, max(len(m.displayRows)-1, 0))
 		}
 		return m, nil
@@ -533,7 +549,7 @@ func (m Model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	m.searchQuery += string(r)
-	m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, m.searchQuery)
+	m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, m.searchQuery, m.sortMode)
 	m.cursor = min(m.cursor, max(len(m.displayRows)-1, 0))
 	return m, nil
 }
@@ -567,6 +583,23 @@ func (m Model) copyQuery(withArgs bool) Model {
 	}
 	_ = clipboard.Copy(context.Background(), text)
 	return m
+}
+
+func (m Model) clearFilter() Model {
+	if m.searchQuery != "" {
+		m.searchQuery = ""
+		m.displayRows, m.txColorMap = rebuildDisplayRows(m.events, m.collapsed, "", m.sortMode)
+		m.cursor = min(m.cursor, max(len(m.displayRows)-1, 0))
+	}
+	return m
+}
+
+func explainModeFromKey(key string) explain.Mode {
+	switch key {
+	case "X", "E":
+		return explain.Analyze
+	}
+	return explain.Explain
 }
 
 func (m Model) startEditExplain(mode explain.Mode) (tea.Model, tea.Cmd) {
