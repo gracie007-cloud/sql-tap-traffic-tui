@@ -26,6 +26,7 @@ const (
 	viewList viewMode = iota
 	viewInspect
 	viewExplain
+	viewAnalytics
 )
 
 type sortMode int
@@ -79,6 +80,11 @@ type Model struct {
 	explainMode    explain.Mode
 	explainQuery   string
 	explainArgs    []string
+
+	analyticsRows     []analyticsRow
+	analyticsCursor   int
+	analyticsHScroll  int
+	analyticsSortMode analyticsSortMode
 }
 
 // eventMsg carries a received QueryEvent from the gRPC stream.
@@ -197,6 +203,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateInspect(msg)
 		case viewExplain:
 			return m.updateExplain(msg)
+		case viewAnalytics:
+			return m.updateAnalytics(msg)
 		case viewList:
 			return m.updateList(msg)
 		}
@@ -228,6 +236,8 @@ func (m Model) View() string {
 		return m.renderInspector()
 	case viewExplain:
 		return m.renderExplain()
+	case viewAnalytics:
+		return m.renderAnalytics()
 	case viewList:
 	}
 
@@ -238,7 +248,7 @@ func (m Model) View() string {
 	case m.searchMode:
 		footer = fmt.Sprintf("  / %s█", m.searchQuery)
 	default:
-		footer = "  q: quit  j/k: navigate  space: toggle tx  enter: inspect" +
+		footer = "  q: quit  j/k: navigate  space: toggle tx  enter: inspect  a: analytics" +
 			"  c: copy query  C: copy with args  x/X: explain/analyze  e/E: edit+explain" +
 			"  /: search  s: sort"
 		if m.searchQuery != "" {
@@ -458,16 +468,9 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.searchQuery = ""
 		return m, nil
 	case "s":
-		switch m.sortMode {
-		case sortChronological:
-			m.sortMode = sortDuration
-			m.follow = false
-		case sortDuration:
-			m.sortMode = sortChronological
-		}
-		m.displayRows, m.txColorMap = m.rebuildDisplayRows()
-		m.cursor = 0
-		return m, nil
+		return m.toggleSort(), nil
+	case "a":
+		return m.enterAnalytics(), nil
 	case "esc":
 		return m.clearFilter(), nil
 	case " ":
@@ -580,6 +583,28 @@ func (m Model) copyQuery(withArgs bool) Model {
 		text = query.Bind(text, ev.GetArgs())
 	}
 	_ = clipboard.Copy(context.Background(), text)
+	return m
+}
+
+func (m Model) toggleSort() Model {
+	switch m.sortMode {
+	case sortChronological:
+		m.sortMode = sortDuration
+		m.follow = false
+	case sortDuration:
+		m.sortMode = sortChronological
+	}
+	m.displayRows, m.txColorMap = m.rebuildDisplayRows()
+	m.cursor = 0
+	return m
+}
+
+func (m Model) enterAnalytics() Model {
+	m.analyticsRows = m.buildAnalyticsRows()
+	sortAnalyticsRows(m.analyticsRows, m.analyticsSortMode)
+	m.analyticsCursor = 0
+	m.analyticsHScroll = 0
+	m.view = viewAnalytics
 	return m
 }
 
