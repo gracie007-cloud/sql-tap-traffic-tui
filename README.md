@@ -2,8 +2,9 @@
 
 Real-time SQL traffic viewer — proxy daemon + TUI client.
 
-sql-tap sits between your application and PostgreSQL, capturing every query and displaying it in an interactive terminal
-UI. Inspect queries, view transactions, and run EXPLAIN — all without changing your application code.
+sql-tap sits between your application and your database (PostgreSQL or MySQL), capturing every query and displaying it
+in an interactive terminal UI. Inspect queries, view transactions, and run EXPLAIN — all without changing your
+application code.
 
 ![demo](./docs/demo.gif)
 
@@ -32,13 +33,26 @@ make install
 
 ### Docker
 
+**PostgreSQL**
+
 ```dockerfile
 FROM postgres:18-alpine
+ARG SQL_TAP_VERSION=0.0.1
+ARG TARGETARCH``
+ADD https://github.com/mickamy/sql-tap/releases/download/v${SQL_TAP_VERSION}/sql-tap_${SQL_TAP_VERSION}_linux_${TARGETARCH}.tar.gz /tmp/sql-tap.tar.gz
+RUN tar -xzf /tmp/sql-tap.tar.gz -C /usr/local/bin sql-tapd && rm /tmp/sql-tap.tar.gz
+ENTRYPOINT ["sql-tapd", "--driver=postgres", "--listen=:5433", "--upstream=localhost:5432", "--grpc=:9091"]
+```
+
+**MySQL**
+
+```dockerfile
+FROM mysql:8
 ARG SQL_TAP_VERSION=0.0.1
 ARG TARGETARCH
 ADD https://github.com/mickamy/sql-tap/releases/download/v${SQL_TAP_VERSION}/sql-tap_${SQL_TAP_VERSION}_linux_${TARGETARCH}.tar.gz /tmp/sql-tap.tar.gz
 RUN tar -xzf /tmp/sql-tap.tar.gz -C /usr/local/bin sql-tapd && rm /tmp/sql-tap.tar.gz
-ENTRYPOINT ["sql-tapd"]
+ENTRYPOINT ["sql-tapd", "--driver=mysql", "--listen=:3307", "--upstream=localhost:3306", "--grpc=:9091"]
 ```
 
 ## Quick start
@@ -46,15 +60,19 @@ ENTRYPOINT ["sql-tapd"]
 **1. Start the proxy daemon**
 
 ```bash
-# Proxy listens on :5433, forwards to PostgreSQL on :5432
+# PostgreSQL: proxy listens on :5433, forwards to PostgreSQL on :5432
 DATABASE_URL="postgres://user:pass@localhost:5432/db?sslmode=disable" \
-  sql-tapd -listen :5433 -upstream localhost:5432
+  sql-tapd --driver=postgres --listen=:5433 --upstream=localhost:5432
+
+# MySQL: proxy listens on :3307, forwards to MySQL on :3306
+DATABASE_URL="user:pass@tcp(localhost:3306)/db" \
+  sql-tapd --driver=mysql --listen=:3307 --upstream=localhost:3306
 ```
 
 **2. Point your application at the proxy**
 
-Connect your app to `localhost:5433` instead of `localhost:5432`. No code changes needed — sql-tapd speaks the
-PostgreSQL wire protocol.
+Connect your app to the proxy port instead of the database port. No code changes needed — sql-tapd speaks the native
+wire protocol.
 
 **3. Launch the TUI**
 
@@ -75,9 +93,9 @@ Usage:
   sql-tapd [flags]
 
 Flags:
-  -driver    database driver: postgres (default: "postgres")
-  -listen    client listen address (default: ":5433")
-  -upstream  upstream database address (default: "localhost:5432")
+  -driver    database driver: postgres, mysql (required)
+  -listen    client listen address (required)
+  -upstream  upstream database address (required)
   -grpc      gRPC server address for TUI (default: ":9091")
   -dsn-env   env var holding DSN for EXPLAIN (default: "DATABASE_URL")
   -version   show version and exit
@@ -146,9 +164,9 @@ Flags:
 ## How it works
 
 ```
-┌─────────────┐      ┌───────────────────────┐      ┌──────────────┐
-│ Application │─────▶│  sql-tapd (proxy)      │─────▶│  PostgreSQL  │
-└─────────────┘      │                       │      └──────────────┘
+┌─────────────┐      ┌───────────────────────┐      ┌────────────────────┐
+│ Application │─────▶│  sql-tapd (proxy)     │─────▶│ PostgreSQL / MySQL │
+└─────────────┘      │                       │      └────────────────────┘
                      │  captures queries     │
                      │  via wire protocol    │
                      └───────────┬───────────┘
@@ -158,9 +176,9 @@ Flags:
                      └───────────────────────┘
 ```
 
-sql-tapd parses the PostgreSQL wire protocol to intercept queries transparently. It tracks prepared statements,
-parameter bindings, transactions, execution time, rows affected, and errors. Events are streamed to connected TUI
-clients via gRPC.
+sql-tapd parses the database wire protocol (PostgreSQL or MySQL) to intercept queries transparently. It tracks prepared
+statements, parameter bindings, transactions, execution time, rows affected, and errors. Events are streamed to
+connected TUI clients via gRPC.
 
 ## License
 
