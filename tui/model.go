@@ -421,16 +421,25 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) startEditExplain(mode explain.Mode) (tea.Model, tea.Cmd) {
 	ev := m.cursorEvent()
-	if ev == nil || ev.GetQuery() == "" {
+	if ev == nil || ev.GetQuery() == "" || isLifecycleOp(ev) {
 		return m, nil
 	}
 
 	return m, openEditor(ev.GetQuery(), ev.GetArgs(), mode)
 }
 
+func isLifecycleOp(ev *tapv1.QueryEvent) bool {
+	switch proxy.Op(ev.GetOp()) {
+	case proxy.OpBegin, proxy.OpCommit, proxy.OpRollback:
+		return true
+	case proxy.OpQuery, proxy.OpExec, proxy.OpPrepare, proxy.OpBind, proxy.OpExecute:
+	}
+	return false
+}
+
 func (m Model) startExplain(mode explain.Mode) (tea.Model, tea.Cmd) {
 	ev := m.cursorEvent()
-	if ev == nil || ev.GetQuery() == "" {
+	if ev == nil || ev.GetQuery() == "" || isLifecycleOp(ev) {
 		return m, nil
 	}
 
