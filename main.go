@@ -4,6 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
+
+	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/mickamy/sql-tap/tui"
 )
 
 var version = "dev"
@@ -33,5 +37,10 @@ func main() {
 }
 
 func monitor(addr string) {
-	fmt.Fprintf(os.Stdout, "not implemented yet\n")
+	m := tui.New(addr)
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
 }
