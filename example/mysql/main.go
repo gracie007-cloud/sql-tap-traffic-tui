@@ -13,7 +13,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-const dsn = "mysql:mysql@tcp(localhost:3307)/db?parseTime=true"
+const defaultDSN = "mysql:mysql@tcp(localhost:3307)/db?parseTime=true"
 
 const upsertUser = "INSERT INTO users (name, email) VALUES (?, ?)" +
 	" ON DUPLICATE KEY UPDATE name = VALUES(name)"
@@ -24,10 +24,18 @@ func main() {
 	}
 }
 
+func getDSN() string {
+	if v := os.Getenv("DATABASE_DSN"); v != "" {
+		return v
+	}
+	return defaultDSN
+}
+
 func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
+	dsn := getDSN()
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		return fmt.Errorf("open: %w", err)
@@ -37,7 +45,7 @@ func run() error {
 	if err := db.PingContext(ctx); err != nil {
 		return fmt.Errorf("ping: %w", err)
 	}
-	fmt.Println("connected to mysql via tapd proxy on :3307")
+	fmt.Printf("connected to mysql via %s\n", dsn)
 
 	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
