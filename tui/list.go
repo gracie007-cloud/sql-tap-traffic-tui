@@ -118,6 +118,17 @@ func (m Model) renderTxSummaryRow(dr displayRow, isCursor bool, colQuery int) st
 
 	styled := lipgloss.NewStyle().Foreground(m.txColorMap[dr.txID])
 
+	if isCursor {
+		styled = styled.Bold(true)
+		bold := lipgloss.NewStyle().Bold(true)
+		return bold.Render(marker) +
+			styled.Render(chevron) +
+			padRight(styled.Render("Tx"), colOp) + " " +
+			padRight(bold.Render(label), colQuery) + " " +
+			padLeft(bold.Render(dur), colDuration) + " " +
+			padLeft(bold.Render(t), colTime)
+	}
+
 	return fmt.Sprintf("%s%s%s %-*s %*s %*s",
 		marker,
 		styled.Render(chevron),
@@ -153,6 +164,16 @@ func (m Model) renderEventRow(dr displayRow, drIdx int, isCursor bool, colQuery 
 
 	if m.isTxChild(drIdx) {
 		styled := lipgloss.NewStyle().Foreground(m.txColorMap[ev.GetTxId()])
+		if isCursor {
+			styled = styled.Bold(true)
+			bold := lipgloss.NewStyle().Bold(true)
+			return bold.Render(marker) +
+				bold.Render(indent) +
+				padRight(styled.Render(op), colOp) + " " +
+				padRight(bold.Render(q), cq) + " " +
+				padLeft(bold.Render(dur), colDuration) + " " +
+				padLeft(bold.Render(t), colTime)
+		}
 		return fmt.Sprintf("%s%s%s %-*s %*s %*s",
 			marker,
 			indent,
@@ -163,7 +184,7 @@ func (m Model) renderEventRow(dr displayRow, drIdx int, isCursor bool, colQuery 
 		)
 	}
 
-	return fmt.Sprintf("%s%s%-*s %-*s %*s %*s",
+	row := fmt.Sprintf("%s%s%-*s %-*s %*s %*s",
 		marker,
 		indent,
 		colOp, op,
@@ -171,6 +192,10 @@ func (m Model) renderEventRow(dr displayRow, drIdx int, isCursor bool, colQuery 
 		colDuration, dur,
 		colTime, t,
 	)
+	if isCursor {
+		row = lipgloss.NewStyle().Bold(true).Render(row)
+	}
+	return row
 }
 
 func (m Model) renderPreview() string {
