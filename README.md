@@ -1,5 +1,7 @@
 # sql-tap
 
+[![Sponsor](https://img.shields.io/badge/Sponsor-❤-ea4aaa?style=flat-square&logo=github)](https://github.com/sponsors/mickamy)
+
 Real-time SQL traffic viewer — proxy daemon + TUI client.
 
 sql-tap sits between your application and your database (PostgreSQL, MySQL, or TiDB), capturing every query and
