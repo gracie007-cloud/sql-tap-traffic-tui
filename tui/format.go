@@ -32,6 +32,14 @@ func padRight(s string, width int) string {
 	return s + strings.Repeat(" ", width-w)
 }
 
+func padLeft(s string, width int) string {
+	w := lipgloss.Width(s)
+	if w >= width {
+		return s
+	}
+	return strings.Repeat(" ", width-w) + s
+}
+
 var reSpaces = regexp.MustCompile(`\s+`)
 
 func truncate(s string, maxLen int) string {

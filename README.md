@@ -1,10 +1,12 @@
 # sql-tap
 
+[![Sponsor](https://img.shields.io/badge/Sponsor-❤-ea4aaa?style=flat-square&logo=github)](https://github.com/sponsors/mickamy)
+
 Real-time SQL traffic viewer — proxy daemon + TUI client.
 
-sql-tap sits between your application and your database (PostgreSQL or MySQL), capturing every query and displaying it
-in an interactive terminal UI. Inspect queries, view transactions, and run EXPLAIN — all without changing your
-application code.
+sql-tap sits between your application and your database (PostgreSQL, MySQL, or TiDB), capturing every query and
+displaying it in an interactive terminal UI. Inspect queries, view transactions, and run EXPLAIN — all without changing
+your application code.
 
 ![demo](./docs/demo.gif)
 
@@ -67,6 +69,10 @@ DATABASE_URL="postgres://user:pass@localhost:5432/db?sslmode=disable" \
 # MySQL: proxy listens on :3307, forwards to MySQL on :3306
 DATABASE_URL="user:pass@tcp(localhost:3306)/db" \
   sql-tapd --driver=mysql --listen=:3307 --upstream=localhost:3306
+
+# TiDB: proxy listens on :4001, forwards to TiDB on :4000
+DATABASE_URL="user:pass@tcp(localhost:4000)/db" \
+  sql-tapd --driver=tidb --listen=:4001 --upstream=localhost:4000
 ```
 
 **2. Point your application at the proxy**
@@ -93,7 +99,7 @@ Usage:
   sql-tapd [flags]
 
 Flags:
-  -driver    database driver: postgres, mysql (required)
+  -driver    database driver: postgres, mysql, tidb (required)
   -listen    client listen address (required)
   -upstream  upstream database address (required)
   -grpc      gRPC server address for TUI (default: ":9091")
@@ -184,9 +190,9 @@ Flags:
 ## How it works
 
 ```
-┌─────────────┐      ┌───────────────────────┐      ┌────────────────────┐
-│ Application │─────▶│  sql-tapd (proxy)     │─────▶│ PostgreSQL / MySQL │
-└─────────────┘      │                       │      └────────────────────┘
+┌─────────────┐      ┌───────────────────────┐      ┌───────────────────────────┐
+│ Application │─────▶│  sql-tapd (proxy)     │─────▶│ PostgreSQL / MySQL / TiDB │
+└─────────────┘      │                       │      └───────────────────────────┘
                      │  captures queries     │
                      │  via wire protocol    │
                      └───────────┬───────────┘
@@ -196,7 +202,7 @@ Flags:
                      └───────────────────────┘
 ```
 
-sql-tapd parses the database wire protocol (PostgreSQL or MySQL) to intercept queries transparently. It tracks prepared
+sql-tapd parses the database wire protocol (PostgreSQL, MySQL, or TiDB) to intercept queries transparently. It tracks prepared
 statements, parameter bindings, transactions, execution time, rows affected, and errors. Events are streamed to
 connected TUI clients via gRPC.
 
